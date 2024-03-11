@@ -84,7 +84,8 @@ export class ChatGPTUnofficialProxyAPI {
    *
    * Set `debug: true` in the `ChatGPTAPI` constructor to log more info on the full prompt sent to the OpenAI completions API. You can override the `promptPrefix` and `promptSuffix` in `opts` to customize the prompt.
    *
-   * @param message - The prompt message to send
+   * @param text - The prompt message to send
+   * @param opts
    * @param opts.conversationId - Optional ID of a conversation to continue (defaults to a random UUID)
    * @param opts.parentMessageId - Optional ID of the previous message in the conversation (defaults to `undefined`)
    * @param opts.messageId - Optional ID of the message to send (defaults to a random UUID)
@@ -95,7 +96,15 @@ export class ChatGPTUnofficialProxyAPI {
    * @returns The response from ChatGPT
    */
   async sendMessage(
-    text: string,
+    text:
+      | string
+      | {
+          type: string
+          text?: string
+          image_url?: {
+            url: string
+          }
+        }[],
     opts: types.SendMessageBrowserOptions = {}
   ): Promise<types.ChatMessage> {
     if (!!opts.conversationId !== !!opts.parentMessageId) {
@@ -147,7 +156,7 @@ export class ChatGPTUnofficialProxyAPI {
           role: 'user',
           content: {
             content_type: 'text',
-            parts: [text]
+            parts: [text.toString()]
           }
         }
       ],

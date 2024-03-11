@@ -1,3 +1,4 @@
+import * as util from 'util'
 import Keyv from 'keyv'
 import pTimeout from 'p-timeout'
 import QuickLRU from 'quick-lru'
@@ -122,7 +123,8 @@ export class ChatGPTAPI {
    *
    * Set `debug: true` in the `ChatGPTAPI` constructor to log more info on the full prompt sent to the OpenAI chat completions API. You can override the `systemMessage` in `opts` to customize the assistant's instructions.
    *
-   * @param message - The prompt message to send
+   * @param text - The prompt message to send
+   * @param opts
    * @param opts.parentMessageId - Optional ID of the previous message in the conversation (defaults to `undefined`)
    * @param opts.conversationId - Optional ID of the conversation (defaults to `undefined`)
    * @param opts.messageId - Optional ID of the message to send (defaults to a random UUID)
@@ -130,12 +132,19 @@ export class ChatGPTAPI {
    * @param opts.timeoutMs - Optional timeout in milliseconds (defaults to no timeout)
    * @param opts.onProgress - Optional callback which will be invoked every time the partial response is updated
    * @param opts.abortSignal - Optional callback used to abort the underlying `fetch` call using an [AbortController](https://developer.mozilla.org/en-US/docs/Web/API/AbortController)
-   * @param completionParams - Optional overrides to send to the [OpenAI chat completion API](https://platform.openai.com/docs/api-reference/chat/create). Options like `temperature` and `presence_penalty` can be tweaked to change the personality of the assistant.
    *
    * @returns The response from ChatGPT
    */
   async sendMessage(
-    text: string,
+    text:
+      | string
+      | {
+          type: string
+          text?: string
+          image_url?: {
+            url: string
+          }
+        }[],
     opts: types.SendMessageOptions = {}
   ): Promise<types.ChatMessage> {
     const {
@@ -201,7 +210,12 @@ export class ChatGPTAPI {
         }
 
         if (this._debug) {
-          console.log(`sendMessage (${numTokens} tokens)`, body)
+          const regex = /("data:image\/.{30}).*?(.{40}")/g
+          const bodyLogStr = util.inspect(
+            JSON.parse(JSON.stringify(body).replace(regex, '$1...$2')),
+            { depth: null }
+          )
+          console.log(`sendMessage (${numTokens} tokens)`, bodyLogStr)
         }
 
         if (stream) {
@@ -214,7 +228,7 @@ export class ChatGPTAPI {
               signal: abortSignal,
               onMessage: (data: string) => {
                 if (data === '[DONE]') {
-                  result.text = result.text.trim()
+                  result.text = result.text.toString().trim()
                   return resolve(result)
                 }
 
@@ -305,7 +319,9 @@ export class ChatGPTAPI {
       if (message.detail && !message.detail.usage) {
         try {
           const promptTokens = numTokens
-          const completionTokens = await this._getTokenCount(message.text)
+          const completionTokens = await this._getTokenCount(
+            message.text.toString()
+          )
           message.detail.usage = {
             prompt_tokens: promptTokens,
             completion_tokens: completionTokens,
@@ -358,7 +374,18 @@ export class ChatGPTAPI {
     this._apiOrg = apiOrg
   }
 
-  protected async _buildMessages(text: string, opts: types.SendMessageOptions) {
+  protected async _buildMessages(
+    content:
+      | string
+      | {
+          type: string
+          text?: string
+          image_url?: {
+            url: string
+          }
+        }[],
+    opts: types.SendMessageOptions
+  ) {
     const { systemMessage = this._systemMessage } = opts
     let { parentMessageId } = opts
 
@@ -376,11 +403,11 @@ export class ChatGPTAPI {
     }
 
     const systemMessageOffset = messages.length
-    let nextMessages = text
+    let nextMessages = content
       ? messages.concat([
           {
             role: 'user',
-            content: text,
+            content: content,
             name: opts.name
           }
         ])

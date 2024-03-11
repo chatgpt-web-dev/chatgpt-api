@@ -64,7 +64,15 @@ export type SendMessageBrowserOptions = {
 
 export interface ChatMessage {
   id: string
-  text: string
+  text:
+    | string
+    | {
+        type: string
+        text?: string
+        image_url?: {
+          url: string
+        }
+      }[]
   role: Role
   name?: string
   delta?: string
@@ -224,7 +232,15 @@ export namespace openai {
      * @type {string}
      * @memberof ChatCompletionRequestMessage
      */
-    content: string
+    content:
+      | string
+      | {
+          type: string
+          text?: string
+          image_url?: {
+            url: string
+          }
+        }[]
     /**
      * The name of the user in a multi-user chat
      * @type {string}
